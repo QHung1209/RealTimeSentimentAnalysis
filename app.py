@@ -3,17 +3,6 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 
-# Custom CSS to set background color to white
-st.markdown(
-    """
-    <style>
-    body {
-        background-color: white;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # Function to highlight NER labels in the content
 def highlight_ner(content, ner_label):

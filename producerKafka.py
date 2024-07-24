@@ -1,19 +1,21 @@
 from kafka import KafkaProducer
 import pandas as pd
+import time
 import re
+import os
 from pyvi import ViTokenizer
 import spacy
 
 nlp_ner = spacy.load("./output/model-best")
-
+processed_files = set()
 
 def apply_ner(text):
     doc = nlp_ner(text)
     ner_labels = [(ent.text, ent.label_) for ent in doc.ents]
     return ner_labels
 
-KAFKA_TOPIC_NAME_CONS = "demo"
-KAFKA_BOOTSTRAP_SERVERS_CONS = "192.168.1.7:9092"
+KAFKA_TOPIC_NAME_CONS = "finalpj"
+KAFKA_BOOTSTRAP_SERVERS_CONS = "192.168.44.112:9092"
 
 def error_callback(exc):
     raise Exception("Error while sending data to Kafka: {0}".format(str(exc)))
@@ -272,18 +274,31 @@ def format_ner_label(row):
             labels.append(f"{entity}: {tag}")
         return ', '.join(labels)
 
+last_processed_time = time.time()
 
 while True:
     try:
-        data_real_time = pd.read_csv(csv_file)
-        data_real_time = data_real_time.dropna()
-        data_real_time['preprocessed'] = data_real_time['content'].apply(chuyen_viet_tat)
-        data_real_time['preprocessed'] = data_real_time['preprocessed'].apply(remove_stopwords)
-        data_real_time['preprocessed'] = data_real_time['preprocessed'].apply(loai_bo_chu_cai_lap)
-        data_real_time['NER_label'] = data_real_time['content'].apply(apply_ner)
-        data_real_time['NER_label'] = data_real_time.apply(format_ner_label, axis=1)
-        data_real_time['tokenize'] = data_real_time['preprocessed'].apply(lambda text: ViTokenizer.tokenize(text))
-        write_to_kafka(KAFKA_TOPIC_NAME_CONS, data_real_time)
+        new_files_detected = False
+        for csv_file in os.listdir("./data"):
+            if csv_file.endswith(".csv") and csv_file not in processed_files:
+                data_real_time = pd.read_csv(f"./data/{csv_file}")
+                data_real_time = data_real_time.dropna()
+                data_real_time['preprocessed'] = data_real_time['content'].apply(chuyen_viet_tat)
+                data_real_time['preprocessed'] = data_real_time['preprocessed'].apply(remove_stopwords)
+                data_real_time['preprocessed'] = data_real_time['preprocessed'].apply(loai_bo_chu_cai_lap)
+                data_real_time['NER_label'] = data_real_time['content'].apply(apply_ner)
+                data_real_time['NER_label'] = data_real_time.apply(format_ner_label, axis=1)
+                data_real_time['tokenize'] = data_real_time['preprocessed'].apply(lambda text: ViTokenizer.tokenize(text))
+                write_to_kafka(KAFKA_TOPIC_NAME_CONS, data_real_time)
+                processed_files.add(csv_file)
+                new_files_detected = True
+                last_processed_time = time.time()
+
+        if not new_files_detected and (time.time() - last_processed_time) > 60:
+            print("No new files detected in the last 60 seconds. Stopping the loop.")
+            break
+
     except Exception as e:
         print(f"Error: {e}")
-    break  # Remove or modify this line if you want to continuously read and send data
+
+    time.sleep(5)

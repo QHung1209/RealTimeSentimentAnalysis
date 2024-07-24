@@ -16,8 +16,8 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # Định nghĩa các tham số Kafka
-kafka_bootstrap_servers = '192.168.1.7:9092'
-kafka_topic_name = 'demo'
+kafka_bootstrap_servers = '192.168.44.112:9092'
+kafka_topic_name = 'finalpj'
 
 # Định nghĩa schema cho dữ liệu nhận vào
 schema = StructType([
@@ -41,7 +41,7 @@ df = df.withColumn("value", from_json(col("value"), schema))
 df = df.select("value.*")
 # Print the data to the console
 df = df.dropna()
-loaded_model = PipelineModel.load("./model/lr_model")
+loaded_model = PipelineModel.load("./model/svm_model")
 
 # Áp dụng model đã load để dự đoán
 predictions = loaded_model.transform(df)
